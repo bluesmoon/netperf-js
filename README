@@ -1,2 +1,5 @@
-Read the comments in bw-test.js or look at the tests in tests/*.html for information
-on how to use this code.
+1. Unpack the .zip file into a web accessible directory
+2. Read the comments in bw-test.js or look at the tests in tests/*.html for information
+   on how to use this code.
+3. Update the base_url variable in bw-test.js to the URL that you unzipped the files into
+4. You can get rid of the tests/ directory once you're done reading it
