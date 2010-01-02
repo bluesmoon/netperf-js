@@ -1,1 +1,2 @@
-zip -r bw-test.zip bw-test.js image*.png README tests/*.html
+VERSION=`awk '/^	version: ".*",/ { print $2; }' bw-test.js | sed -e 's/[^a-zA-Z0-9\.-]//g'`
+zip -r bw-test-$VERSION.zip bw-test.js image*.png README tests/*.html
