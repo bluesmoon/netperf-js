@@ -1,0 +1,29 @@
+<html>
+<head>
+<title>Bandwidth test</title>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+</head>
+<body>
+<h1>Client download bandwidth test</h1>
+<p>
+This test tries to estimate the bandwidth between you and my server (Dreamhost).  Many factors affect this bandwidth and it may not be entirely consistent across multiple runs.
+Click the button below to begin.
+</p>
+
+<p>
+Note that I store the results along with your IP address and the timestamp when the test was run.  I haven't yet decided
+what to do with that data, but the most likely thought is to create an ISP map, or possibly even do geo lookups on the IP address to figure out the effective
+bandwidth of users from various locations.  If this is not acceptable, then do not click the button.
+</p>
+
+<p>
+A more <a href="http://tech.bluesmoon.info/2009/11/measuring-users-bandwidth.html">detailed explanation</a> is on my tech blog.
+</p>
+
+<form>
+<input type="submit" id="start-test" value="Begin test">
+</form>
+<p id="result"></p>
+<script src="runtest.js" type="text/javascript"></script>
+</body>
+</html>
