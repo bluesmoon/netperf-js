@@ -1,5 +1,7 @@
 /*
- See http://tech.bluesmoon.info/2009/11/measuring-users-bandwidth.html for background.
+See http://tech.bluesmoon.info/2009/11/measuring-users-bandwidth.html for background.
+
+This code is distributed under the BSD license.  Copyright (c) 2010 Philip S Tellis
 */
 
 /**
@@ -32,16 +34,32 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 	- PERFORMANCE.BWTest.log_level:		To turn on firebug console logging, set PERFORMANCE.log_level="debug"
 
 These parameters should be set BEFORE including the script on your page.
+
+
+Methods:
+	- PERFORMANCE.BWTest.run():		Call this to start the test manually.  Required if you set PERFORMANCE.BWTest.auto_run to false.
+	- PERFORMANCE.BWTest.init():		Call this to reinitialise test runs.  Required if you call run() multiple times.
+
+Events:
+	- PERFORMANCE.BWTest.oncomplete:	Callback function that will be called when the test has completed.  The result object (as described below) will be passed to this function.
+
+After the test has completed, PERFORMANCE.BWTest.beacon_url will be called with the paramters defined above.  You may also check the bandwidth and latency values from your script using
+the following parameters:
+
+	- PERFORMANCE.BWTest.bandwidth_median
+	- PERFORMANCE.BWTest.bandwidth_gmean
+	- PERFORMANCE.BWTest.latency_median
+	- PERFORMANCE.BWTest.latency_gmean
 */
 (function() {
 
 var defaults = {
 	version: "1.0",
 	auto_run: true,
-	log_level = 'none',
+	log_level: 'none',
 
 	base_url: '',
-	beacon_url = '',
+	beacon_url: '',
 
 	timeout: 3000,
 	nruns: 3,
@@ -54,22 +72,31 @@ var defaults = {
 // Do not change anything below this line
 // ---------------------------------------
 
-if(!base_url) {
-	alert('Set the base_url variable in this script the the directory where your bandwidth images are stored');
-	return false;
-}
-
 if(typeof PERFORMANCE === 'undefined')
 	window.PERFORMANCE = {};
 
-if(typeof PERFORMANCE.BWTest !== 'undefined' && typeof PERFORMANCE.BWTest.version !== 'undefined' ) {
-	return false;		// don't allow this JS to be included twice
+if(typeof PERFORMANCE.BWTest === 'undefined')
+	PERFORMANCE.BWTest = {};
+
+if(typeof PERFORMANCE.BWTest.version !== 'undefined' ) {
+	return false;		// don't allow this script to be included twice
 }
 
 for(var k in defaults) {
 	if(defaults.hasOwnProperty(k) && typeof PERFORMANCE.BWTest[k] === 'undefined')
 		PERFORMANCE.BWTest[k] = defaults[k];
 }
+
+if(!PERFORMANCE.BWTest.base_url) {
+	alert('Set the base_url variable in this script the the directory where your bandwidth images are stored');
+	return false;
+}
+
+var base_url = PERFORMANCE.BWTest.base_url;
+var beacon_url = PERFORMANCE.BWTest.beacon_url;
+var timeout = PERFORMANCE.BWTest.timeout;
+var nruns = PERFORMANCE.BWTest.nruns;
+var latency_runs = PERFORMANCE.BWTest.latency_runs;
 
 
 var runs_left=nruns;
@@ -84,11 +111,11 @@ if(typeof console === 'undefined')
 	console = { log: function() {} };
 
 var console_log = function() {
-	if(PERFORMANCE.log_level === 'debug')
-		console.log(arguments);
+	if(PERFORMANCE.BWTest.log_level === 'debug')
+		console.log(arguments[0]);
 }
 
-var init = function()
+PERFORMANCE.BWTest.init = function()
 {
 	runs_left=nruns;
 	latency_runs=10;
@@ -96,7 +123,7 @@ var init = function()
 	latencies = [];
 };
 
-PERFORMANCE.run = function()
+PERFORMANCE.BWTest.run = function()
 {
 	if(!latency_runs) {
 		finish();
@@ -139,7 +166,7 @@ var lat_loaded = function(i, tstart, run, success)
 		var lat = new Date().getTime() - tstart;
 		latencies.push(lat);
 	}
-	defer(PERFORMANCE.run);
+	defer(PERFORMANCE.BWTest.run);
 };
 
 var img_loaded = function(i, tstart, run, success)
@@ -161,7 +188,7 @@ var img_loaded = function(i, tstart, run, success)
 		load_img(i+1, run, img_loaded);
 	} else {
 		console_log(results[nruns-run]);
-		defer(PERFORMANCE.run);
+		defer(PERFORMANCE.BWTest.run);
 	}
 };
 
@@ -174,11 +201,11 @@ var finish = function()
 	for(i=0; i<latencies.length; i++) {
 		latencyg += Math.log(latencies[i]);
 	}
-	latencyg = Math.exp(latencyg/latencies.length);
+	latencyg = Math.round(Math.exp(latencyg/latencies.length));
 
 	latencies = iqr(latencies.sort(ncmp));
 	n = latencies.length-1;
-	var latency = (latencies[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2;
+	var latency = Math.round((latencies[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2);
 	console_log(latencies);
 
 	var bw=0;
@@ -205,7 +232,10 @@ var finish = function()
 
 	console_log('bandwidths: ' + bws);
 
-	bws = iqr(bws.sort(ncmp));
+	if(bws.length > 3)
+		bws = iqr(bws.sort(ncmp));
+	else
+		bws = bws.sort(ncmp);
 	n = bws.length-1;
 	var bwm = Math.round((bws[Math.floor(n/2)] + bws[Math.ceil(n/2)])/2);
 	var p95 = Math.round(bws[Math.ceil(n*.95)]);
@@ -215,7 +245,7 @@ var finish = function()
 	
 	if(beacon_url) {
 		var img = new Image();
-		img.src = beacon_url + '?bw=' + Math.round(bwm) + '&latency=' + Math.round(latency) + '&bwg=' + Math.round(bwg) + '&latencyg=' + Math.round(latencyg);
+		img.src = beacon_url + '?bw=' + bwm + '&latency=' + latency + '&bwg=' + bwg + '&latencyg=' + latencyg;
 	}
 
 	var o = {
@@ -229,6 +259,9 @@ var finish = function()
 		if(o.hasOwnProperty(k))
 			PERFORMANCE.BWTest[k] = o[k];
 	}
+
+	if(PERFORMANCE.BWTest.oncomplete)
+		PERFORMANCE.BWTest.oncomplete(o);
 };
 
 var iqr = function(a)
@@ -252,7 +285,8 @@ var iqr = function(a)
 	return b;
 };
 
-init();
-defer(PERFORMANCE.run);
+PERFORMANCE.BWTest.init();
+if(PERFORMANCE.BWTest.auto_run)
+	defer(PERFORMANCE.BWTest.run);
 
 }());
