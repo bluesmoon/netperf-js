@@ -14,10 +14,14 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 
 	- PERFORMANCE.BWTest.beacon_url:	This is the URL that will be called (using the GET method) with the bandwidth parameters.
 						It will have the following parameters:
-						- bw:	The median bandwidth in bytes/second
+						- bw:		The median bandwidth in bytes/second
+						- bwg:		The geometric mean of bandwidth measurements in bytes/second
+						- bwsd:		The standard deviation in all bandwidth samples
+						- bwse:		The standard error at 95% confidence for the reported bandwidth value
 						- latency:	The median HTTP latency in milliseconds
-						- bwg:	The geometric mean of bandwidth measurements in bytes/second
 						- latencyg: 	The geometric mean of HTTP latency measurements in milliseconds
+						- latencysd:	The standard deviation in all latency samples
+						- latencyse:	The standard error at 95% confidence for the reported latency value
 						You may also use this URL to set a browser cookie with the bandwidth and user's IP.
 
 						If not set, nothing will be beaconed, but you can still get the values out of the window.PERFORMANCE.BWTest object.
@@ -54,13 +58,17 @@ the following parameters:
 
 	- PERFORMANCE.BWTest.bandwidth_median
 	- PERFORMANCE.BWTest.bandwidth_gmean
+	- PERFORMANCE.BWTest.bandwidth_stddev
+	- PERFORMANCE.BWTest.bandwidth_stderr
 	- PERFORMANCE.BWTest.latency_median
 	- PERFORMANCE.BWTest.latency_gmean
+	- PERFORMANCE.BWTest.latency_stddev
+	- PERFORMANCE.BWTest.latency_stderr
 */
 (function() {
 
 var defaults = {
-	version: "1.1",
+	version: "1.2",
 	auto_run: true,
 	log_level: 'none',
 
@@ -222,17 +230,30 @@ var finish = function()
 	var i, j, n=0;
 
 	var latencyg=0;
+	var lsum=0;
+	var lsumsq=0;
 	for(i=0; i<latencies.length; i++) {
 		latencyg += Math.log(latencies[i]);
+
+		lsum += latencies[i];
+		lsumsq += latencies[i]*latencies[i];
 	}
+	// geometric mean
 	latencyg = Math.round(Math.exp(latencyg/latencies.length));
 
+	var l_sd = Math.sqrt(lsumsq/latencies.length  -  Math.pow(lsum/latencies.length, 2));
+	var l_se = Math.round(l_sd/Math.sqrt(latencies.length) * 100)/100;
+	l_sd = Math.round(l_sd * 100)/100;
+
+	// iqr filtering and then median
 	latencies = iqr(latencies.sort(ncmp));
+	console_log(latencies);
 	n = latencies.length-1;
 	var latency = Math.round((latencies[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2);
-	console_log(latencies);
 
 	var bw=0;
+	var bsum=0;
+	var bsumsq=0;
 	n=0;
 	var bws=[];
 	for(i=0; i<nruns; i++) {
@@ -245,14 +266,22 @@ var finish = function()
 				continue;
 
 			n++;
-			bw += Math.log(img_sizes[j]*1000/r[j].t);
-			bws.push(Math.round(img_sizes[j]*1000/r[j].t));
+			var b = img_sizes[j]*1000/r[j].t;
+			bw += Math.log(b);
+			bws.push(Math.round(b));
+
+			bsum+=b;
+			bsumsq+=b*b;
 		}
 	}
 
 
 	console_log('got ' + n + ' readings');
 	var bwg = Math.round(Math.exp(bw/n));
+
+	var bw_sd = Math.sqrt(bsumsq/n - Math.pow(bsum/n, 2));
+	var bw_se = Math.round(bw_sd/Math.sqrt(n) * 100)/100;
+	bw_sd = Math.round(bw_sd * 100)/100;
 
 	console_log('bandwidths: ' + bws);
 
@@ -269,14 +298,19 @@ var finish = function()
 	
 	if(beacon_url) {
 		var img = new Image();
-		img.src = beacon_url + '?bw=' + bwm + '&latency=' + latency + '&bwg=' + bwg + '&latencyg=' + latencyg;
+		img.src = beacon_url + '?bw=' + bwm + '&bwg=' + bwg + '&bwsd=' + bw_sd + '&bwse=' + bw_se
+			+ '&latency=' + latency + '&latencyg=' + latencyg + '&latencysd=' + l_sd + '&latencyse=' + l_se;
 	}
 
 	var o = {
 		bandwidth_median:	bwm,
-		latency_median:		latency,
 		bandwidth_gmean:	bwg,
-		latency_gmean:		latencyg
+		bandwidth_stddev:	bw_sd,
+		bandwidth_stderr:	bw_se,
+		latency_median:		latency,
+		latency_gmean:		latencyg,
+		latency_stddev:		l_sd,
+		latency_stderr:		l_se
 	};
 
 	for(var k in o) {
