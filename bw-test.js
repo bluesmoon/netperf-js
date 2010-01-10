@@ -125,6 +125,11 @@ PERFORMANCE.BWTest.init = function()
 
 PERFORMANCE.BWTest.run = function()
 {
+	defer(start);
+}
+
+var start = function()
+{
 	if(!latency_runs) {
 		finish();
 	}
@@ -168,7 +173,7 @@ var lat_loaded = function(i, tstart, run, success)
 		var lat = new Date().getTime() - tstart;
 		latencies.push(lat);
 	}
-	defer(PERFORMANCE.BWTest.run);
+	PERFORMANCE.BWTest.run();
 };
 
 var img_loaded = function(i, tstart, run, success)
@@ -193,7 +198,7 @@ var img_loaded = function(i, tstart, run, success)
 	// we terminate if an image timed out because that means the connection is too slow to go to the next image
 	if(i >= nimages-1 || typeof results[nruns-run].r[i+1] !== 'undefined') {
 		console_log(results[nruns-run]);
-		defer(PERFORMANCE.BWTest.run);
+		PERFORMANCE.BWTest.run();
 	} else {
 		load_img(i+1, run, img_loaded);
 	}
@@ -294,6 +299,6 @@ var iqr = function(a)
 
 PERFORMANCE.BWTest.init();
 if(PERFORMANCE.BWTest.auto_run)
-	defer(PERFORMANCE.BWTest.run);
+	PERFORMANCE.BWTest.run();
 
 }());
