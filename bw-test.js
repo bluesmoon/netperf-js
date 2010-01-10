@@ -42,6 +42,12 @@ Methods:
 
 Events:
 	- PERFORMANCE.BWTest.oncomplete:	Callback function that will be called when the test has completed.  The result object (as described below) will be passed to this function.
+	- PERFORMANCE.BWTest.onloop:		Callback function that will be called before each loop iteration.  This function is called with an object parameter with the following structure:
+							{
+								type: "bandwidth" OR "latency",
+								runs_left: The number of runs left for this type of loop
+							}
+						If this callback returns false, the loop will be terminated immediately, and the performance report will be generated.
 
 After the test has completed, PERFORMANCE.BWTest.beacon_url will be called with the paramters defined above.  You may also check the bandwidth and latency values from your script using
 the following parameters:
@@ -135,9 +141,15 @@ var start = function()
 	}
 	else if(runs_left) {
 		results.push({r:[]});
+		if(PERFORMANCE.BWTest.onloop)
+			if(PERFORMANCE.BWTest.onloop({ type: "bandwidth", runs_left: runs_left }) === false)
+				return finish();
 		load_img(0, runs_left--, img_loaded);
 	}
 	else {
+		if(PERFORMANCE.BWTest.onloop)
+			if(PERFORMANCE.BWTest.onloop({ type: "latency", runs_left: latency_runs }) === false)
+				return finish();
 		load_img('l', latency_runs--, lat_loaded);
 	}
 };
