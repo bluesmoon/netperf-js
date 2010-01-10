@@ -280,8 +280,8 @@ var finish = function()
 	var bwg = Math.round(Math.exp(bw/n));
 
 	var bw_sd = Math.sqrt(bsumsq/n - Math.pow(bsum/n, 2));
-	var bw_se = Math.round(bw_sd/Math.sqrt(n) * 100)/100;
-	bw_sd = Math.round(bw_sd * 100)/100;
+	var bw_se = Math.round(bw_sd/Math.sqrt(n));
+	bw_sd = Math.round(bw_sd);
 
 	console_log('bandwidths: ' + bws);
 
