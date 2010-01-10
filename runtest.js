@@ -49,19 +49,31 @@ PERFORMANCE = {
 		oncomplete: function(o)
 		{
 			var bw = o.bandwidth_median;
+			var bwe = o.bandwidth_stderr;
 		
 			var bw_text = '';
-			if(bw*6 < 1024)
-				bw_text = "" + Math.round(bw*8) + " ";
-			else if(bw*6 < 1024*1024)
-				bw_text = "" + (Math.round(bw*8/1024)) + " k";
-			else if(bw*6 < 1024*1024*1024)
-				bw_text = "" + (Math.round(bw*8/1024/1024)) + " M";
-			else
-				bw_text = "" + (Math.round(bw*8/1024/1024/1024)) + " G";
+			var er_text = '';
+			if(bw*6 < 1024) {
+				er_text = "" + Math.round(bwe*8);
+				bw_text = "" + Math.round(bw*8) + " (&#x00b1 " + er_text + ") ";
+			}
+			else if(bw*6 < 1024*1024) {
+				er_text = "" + (Math.round(bwe*8/1024));
+				bw_text = "" + (Math.round(bw*8/1024)) + " (&#x00b1 " + er_text + ") k";
+			}
+			else if(bw*6 < 1024*1024*1024) {
+				er_text = "" + (Math.round(bwe*8/1024/1024));
+				bw_text = "" + (Math.round(bw*8/1024/1024)) + " (&#x00b1 " + er_text + ") M";
+			}
+			else {
+				er_text = "" + (Math.round(bwe*8/1024/1024/1024));
+				bw_text = "" + (Math.round(bw*8/1024/1024/1024)) + " (&#x00b1 " + er_text + ") G";
+			}
 		
 			document.getElementById('result').innerHTML = "Bandwidth: " + bw_text + "bps, "
-								    + "Latency: " + o.latency_median + "ms" ;
+								    + "Latency: " + o.latency_median + " (&#x00b1; " + o.latency_stderr + ") ms";
+
+			console.log(o);
 		
 			document.getElementById('start-test').disabled=false;
 		},
