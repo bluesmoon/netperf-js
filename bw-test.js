@@ -54,7 +54,7 @@ the following parameters:
 (function() {
 
 var defaults = {
-	version: "1.0",
+	version: "1.1",
 	auto_run: true,
 	log_level: 'none',
 
@@ -144,14 +144,16 @@ var defer = function(method)
 
 var load_img = function(i, run, callback)
 {
-	var url = base_url + 'image-' + i + '.png?t=' + (new Date().getTime()) + Math.random();
+	var url = base_url + 'image-' + i + '.' + (i==='l'?'gif':'png') + '?t=' + (new Date().getTime()) + Math.random();
 	var timer=0, tstart=0;
 	var img = new Image();
 
 	img.onload=function() { img=null; clearTimeout(timer); if(callback) callback(i, tstart, run, true); callback=null; };
 	img.onerror=function() { img=null; clearTimeout(timer); if(callback) callback(i, tstart, run, false); callback=null; };
 
-	timer=setTimeout(function() { img=null; if(callback) callback(i, tstart, run, null); callback=null; }, Math.min(timeout, (typeof i === 'string' ? timeout : img_sizes[i]/5)));
+	// the timeout does not abort download of the current image, it just sets an end of loop flag so the next image won't download
+	// we still need to wait until onload or onerror fire to be sure that the image download isn't using up bandwidth.
+	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, Math.min(timeout, (typeof i === 'string' ? timeout : img_sizes[i]/2)));
 
 	tstart = new Date().getTime();
 	img.src=url;
@@ -177,6 +179,11 @@ var img_loaded = function(i, tstart, run, success)
 	if(results[nruns-run].r[i])		// already called on this image
 		return;
 
+	if(success === null) {			// if timeout, then we set the next image to the end of loop marker
+		results[nruns-run].r[i+1] = {t:null, state: null, run: run};
+		return;
+	}
+
 	var result = { start: tstart, end: new Date().getTime(), t: null, state: success, run: run };
 	if(success) {
 		result.t = result.end-result.start;
@@ -184,11 +191,11 @@ var img_loaded = function(i, tstart, run, success)
 	results[nruns-run].r[i] = result;
 
 	// we terminate if an image timed out because that means the connection is too slow to go to the next image
-	if(success !== null && i < nimages-1) {
-		load_img(i+1, run, img_loaded);
-	} else {
+	if(i >= nimages-1 || typeof results[nruns-run].r[i+1] !== 'undefined') {
 		console_log(results[nruns-run]);
 		defer(PERFORMANCE.BWTest.run);
+	} else {
+		load_img(i+1, run, img_loaded);
 	}
 };
 
