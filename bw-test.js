@@ -242,8 +242,8 @@ var finish = function()
 	latencyg = Math.round(Math.exp(latencyg/latencies.length));
 
 	var l_sd = Math.sqrt(lsumsq/latencies.length  -  Math.pow(lsum/latencies.length, 2));
-	var l_se = Math.round(l_sd/Math.sqrt(latencies.length) * 100)/100;
-	l_sd = Math.round(l_sd * 100)/100;
+	var l_se = (l_sd/Math.sqrt(latencies.length)).toFixed(2);
+	l_sd = l_sd.toFixed(2);
 
 	// iqr filtering and then median
 	latencies = iqr(latencies.sort(ncmp));
@@ -267,7 +267,11 @@ var finish = function()
 	n=0;
 	for(i=0; i<nruns; i++) {
 		var r = results[i].r;
-		for(j=0; j<r.length; j++) {
+
+		// the next loop we iterate through backwards and only consider the largest 3 images that succeeded
+		// that way we don't consider small images that downloaded fast without really saturating the network
+		var nimgs=0;
+		for(j=r.length-1; j>=0 && nimgs<3; j--) {
 			// discard first reading since it pays the price for DNS, TCP setup and slowstart
 			if(i==0 && j==0)
 				continue;
@@ -275,6 +279,7 @@ var finish = function()
 				continue;
 
 			n++;
+			nimgs++;
 
 			var b = img_sizes[j]*1000/r[j].t;
 			bw += Math.log(b);

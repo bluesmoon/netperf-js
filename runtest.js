@@ -52,26 +52,22 @@ PERFORMANCE = {
 			var bwe = o.bandwidth_stderr;
 		
 			var bw_text = '';
-			var er_text = '';
+			var er_text = " (&#x00b1 " + (bwe*100/bw).toPrecision(2) + '%)';
 			if(bw*6 < 1024) {
-				er_text = "" + Math.round(bwe*8);
-				bw_text = "" + Math.round(bw*8) + " (&#x00b1 " + er_text + ") ";
+				bw_text = "" + (bw*8) + " ";
 			}
 			else if(bw*6 < 1024*1024) {
-				er_text = "" + (Math.round(bwe*8/1024));
-				bw_text = "" + (Math.round(bw*8/1024)) + " (&#x00b1 " + er_text + ") k";
+				bw_text = "" + (bw*8/1024).toPrecision(4) + " k";
 			}
 			else if(bw*6 < 1024*1024*1024) {
-				er_text = "" + (Math.round(bwe*8/1024/1024));
-				bw_text = "" + (Math.round(bw*8/1024/1024)) + " (&#x00b1 " + er_text + ") M";
+				bw_text = "" + (bw*8/1024/1024).toPrecision(4) + " M";
 			}
 			else {
-				er_text = "" + (Math.round(bwe*8/1024/1024/1024));
-				bw_text = "" + (Math.round(bw*8/1024/1024/1024)) + " (&#x00b1 " + er_text + ") G";
+				bw_text = "" + (bw*8/1024/1024/1024).toPrecision(4) + " G";
 			}
 		
-			document.getElementById('result').innerHTML = "Bandwidth: " + bw_text + "bps, "
-								    + "Latency: " + o.latency_median + " (&#x00b1; " + o.latency_stderr + ") ms";
+			document.getElementById('result').innerHTML = "Bandwidth: " + bw_text + "bps " + er_text + ", "
+								    + "Latency: " + o.latency_median + "ms (&#x00b1; " + (o.latency_stderr*100/o.latency_median).toPrecision(2) + "%)";
 
 			console.log(o);
 		
