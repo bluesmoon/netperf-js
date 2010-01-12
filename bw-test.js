@@ -15,11 +15,11 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 	- PERFORMANCE.BWTest.beacon_url:	This is the URL that will be called (using the GET method) with the bandwidth parameters.
 						It will have the following parameters:
 						- bw:		The median bandwidth in bytes/second
-						- bwg:		The geometric mean of bandwidth measurements in bytes/second
+						- bwa:		The arithmetic mean of bandwidth measurements in bytes/second
 						- bwsd:		The standard deviation in all bandwidth samples
 						- bwse:		The standard error at 95% confidence for the reported bandwidth value
 						- latency:	The median HTTP latency in milliseconds
-						- latencyg: 	The geometric mean of HTTP latency measurements in milliseconds
+						- latencya: 	The arithmetic mean of HTTP latency measurements in milliseconds
 						- latencysd:	The standard deviation in all latency samples
 						- latencyse:	The standard error at 95% confidence for the reported latency value
 						You may also use this URL to set a browser cookie with the bandwidth and user's IP.
@@ -57,11 +57,11 @@ After the test has completed, PERFORMANCE.BWTest.beacon_url will be called with 
 the following parameters:
 
 	- PERFORMANCE.BWTest.bandwidth_median
-	- PERFORMANCE.BWTest.bandwidth_gmean
+	- PERFORMANCE.BWTest.bandwidth_amean
 	- PERFORMANCE.BWTest.bandwidth_stddev
 	- PERFORMANCE.BWTest.bandwidth_stderr
 	- PERFORMANCE.BWTest.latency_median
-	- PERFORMANCE.BWTest.latency_gmean
+	- PERFORMANCE.BWTest.latency_amean
 	- PERFORMANCE.BWTest.latency_stddev
 	- PERFORMANCE.BWTest.latency_stderr
 */
@@ -229,20 +229,21 @@ var finish = function()
 {
 	var i, j, n=0;
 
-	var latencyg=0;
+	var latencya=0;
 	var lsum=0;
 	var lsumsq=0;
 	for(i=0; i<latencies.length; i++) {
-		latencyg += Math.log(latencies[i]);
+		latencya += latencies[i];
 
 		lsum += latencies[i];
 		lsumsq += latencies[i]*latencies[i];
 	}
-	// geometric mean
-	latencyg = Math.round(Math.exp(latencyg/latencies.length));
+	// arithmetic mean
+	latency = Math.round(latency/latencies.length);
 
 	var l_sd = Math.sqrt(lsumsq/latencies.length  -  Math.pow(lsum/latencies.length, 2));
-	var l_se = (l_sd/Math.sqrt(latencies.length)).toFixed(2);
+	// See http://en.wikipedia.org/wiki/1.96 and http://en.wikipedia.org/wiki/Standard_error_%28statistics%29
+	var l_se = (1.96 * l_sd/Math.sqrt(latencies.length)).toFixed(2);
 	l_sd = l_sd.toFixed(2);
 
 	// iqr filtering and then median
@@ -259,8 +260,8 @@ var finish = function()
 	    bsumsq_c=0,
 	    bws=[],
 	    bws_c=[],
-	    bwg, bw_sd, bw_se,
-	    bwg_c, bw_sd_c, bw_se_c,
+	    bwa, bw_sd, bw_se,
+	    bwa_c, bw_sd_c, bw_se_c,
 	    bwm, p95,
 	    bwm_c, p95_c;
 
@@ -282,13 +283,11 @@ var finish = function()
 			nimgs++;
 
 			var b = img_sizes[j]*1000/r[j].t;
-			bw += Math.log(b);
 			bws.push(Math.round(b));
 			bsum+=b;
 			bsumsq+=b*b;
 
 			var b_c = img_sizes[j]*1000/(r[j].t - latency);
-			bw_c += Math.log(b_c);
 			bws_c.push(Math.round(b_c));
 			bsum_c+=b_c;
 			bsumsq_c+=b_c*b_c;
@@ -298,14 +297,14 @@ var finish = function()
 
 	console_log('got ' + n + ' readings');
 
-	bwg = Math.round(Math.exp(bw/n));
+	bwa = Math.round(bsum/n);
 	bw_sd = Math.sqrt(bsumsq/n - Math.pow(bsum/n, 2));
-	bw_se = Math.round(bw_sd/Math.sqrt(n));
+	bw_se = Math.round(1.96*bw_sd/Math.sqrt(n));
 	bw_sd = Math.round(bw_sd);
 
-	bwg_c = Math.round(Math.exp(bw_c/n));
+	bwa_c = Math.round(bsum_c/n);
 	bw_sd_c = Math.sqrt(bsumsq_c/n - Math.pow(bsum_c/n, 2));
-	bw_se_c = Math.round(bw_sd_c/Math.sqrt(n));
+	bw_se_c = Math.round(1.96 * bw_sd_c/Math.sqrt(n));
 	bw_sd_c = Math.round(bw_sd_c);
 
 	console_log('bandwidths: ' + bws);
@@ -328,22 +327,22 @@ var finish = function()
 	console_log('after iqr: ' + bws);
 	console_log('corrected: ' + bws_c);
 
-	console_log('gmean: ' + bwg + ', median: ' + bwm + ', 95th pc: ' + p95);
-	console_log('corrected gmean: ' + bwg_c + ', median: ' + bwm_c + ', 95th pc: ' + p95_c);
+	console_log('amean: ' + bwa + ', median: ' + bwm + ', 95th pc: ' + p95);
+	console_log('corrected amean: ' + bwa_c + ', median: ' + bwm_c + ', 95th pc: ' + p95_c);
 	
 	if(beacon_url) {
 		var img = new Image();
-		img.src = beacon_url + '?bw=' + bwm + '&bwg=' + bwg + '&bwsd=' + bw_sd + '&bwse=' + bw_se
-			+ '&latency=' + latency + '&latencyg=' + latencyg + '&latencysd=' + l_sd + '&latencyse=' + l_se;
+		img.src = beacon_url + '?bw=' + bwm + '&bwa=' + bwa + '&bwsd=' + bw_sd + '&bwse=' + bw_se
+			+ '&latency=' + latency + '&latencya=' + latencya + '&latencysd=' + l_sd + '&latencyse=' + l_se;
 	}
 
 	var o = {
 		bandwidth_median:	bwm,
-		bandwidth_gmean:	bwg,
+		bandwidth_amean:	bwa,
 		bandwidth_stddev:	bw_sd,
 		bandwidth_stderr:	bw_se,
 		latency_median:		latency,
-		latency_gmean:		latencyg,
+		latency_amean:		latencya,
 		latency_stddev:		l_sd,
 		latency_stderr:		l_se
 	};
