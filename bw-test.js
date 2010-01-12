@@ -251,11 +251,20 @@ var finish = function()
 	n = latencies.length-1;
 	var latency = Math.round((latencies[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2);
 
-	var bw=0;
-	var bsum=0;
-	var bsumsq=0;
+	var bw=0,
+	    bw_c=0,
+	    bsum=0,
+	    bsumsq=0,
+	    bsum_c=0,
+	    bsumsq_c=0,
+	    bws=[],
+	    bws_c=[],
+	    bwg, bw_sd, bw_se,
+	    bwg_c, bw_sd_c, bw_se_c,
+	    bwm, p95,
+	    bwm_c, p95_c;
+
 	n=0;
-	var bws=[];
 	for(i=0; i<nruns; i++) {
 		var r = results[i].r;
 		for(j=0; j<r.length; j++) {
@@ -266,35 +275,56 @@ var finish = function()
 				continue;
 
 			n++;
+
 			var b = img_sizes[j]*1000/r[j].t;
 			bw += Math.log(b);
 			bws.push(Math.round(b));
-
 			bsum+=b;
 			bsumsq+=b*b;
+
+			var b_c = img_sizes[j]*1000/(r[j].t - latency);
+			bw_c += Math.log(b_c);
+			bws_c.push(Math.round(b_c));
+			bsum_c+=b_c;
+			bsumsq_c+=b_c*b_c;
 		}
 	}
 
 
 	console_log('got ' + n + ' readings');
-	var bwg = Math.round(Math.exp(bw/n));
 
-	var bw_sd = Math.sqrt(bsumsq/n - Math.pow(bsum/n, 2));
-	var bw_se = Math.round(bw_sd/Math.sqrt(n));
+	bwg = Math.round(Math.exp(bw/n));
+	bw_sd = Math.sqrt(bsumsq/n - Math.pow(bsum/n, 2));
+	bw_se = Math.round(bw_sd/Math.sqrt(n));
 	bw_sd = Math.round(bw_sd);
 
-	console_log('bandwidths: ' + bws);
+	bwg_c = Math.round(Math.exp(bw_c/n));
+	bw_sd_c = Math.sqrt(bsumsq_c/n - Math.pow(bsum_c/n, 2));
+	bw_se_c = Math.round(bw_sd_c/Math.sqrt(n));
+	bw_sd_c = Math.round(bw_sd_c);
 
-	if(bws.length > 3)
+	console_log('bandwidths: ' + bws);
+	console_log('corrected: ' + bws_c);
+
+	if(bws.length > 3) {
 		bws = iqr(bws.sort(ncmp));
-	else
+		bws_c = iqr(bws_c.sort(ncmp));
+	} else {
 		bws = bws.sort(ncmp);
+		bws_c = bws_c.sort(ncmp);
+	}
 	n = bws.length-1;
-	var bwm = Math.round((bws[Math.floor(n/2)] + bws[Math.ceil(n/2)])/2);
-	var p95 = Math.round(bws[Math.ceil(n*.95)]);
+	bwm = Math.round((bws[Math.floor(n/2)] + bws[Math.ceil(n/2)])/2);
+	p95 = Math.round(bws[Math.ceil(n*.95)]);
+	n_c = bws_c.length-1;
+	bwm_c = Math.round((bws_c[Math.floor(n_c/2)] + bws_c[Math.ceil(n_c/2)])/2);
+	p95_c = Math.round(bws_c[Math.ceil(n_c*.95)]);
 
 	console_log('after iqr: ' + bws);
+	console_log('corrected: ' + bws_c);
+
 	console_log('gmean: ' + bwg + ', median: ' + bwm + ', 95th pc: ' + p95);
+	console_log('corrected gmean: ' + bwg_c + ', median: ' + bwm_c + ', 95th pc: ' + p95_c);
 	
 	if(beacon_url) {
 		var img = new Image();
