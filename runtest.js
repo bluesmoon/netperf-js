@@ -77,6 +77,10 @@ PERFORMANCE = {
 		{
 			document.getElementById('result').innerHTML = "Running " + o.type + " test... " + o.runs_left + " run" + (o.runs_left>1?"s":"") + " to go.";
 			return true;
+		},
+		onload: function()
+		{
+			document.getElementById('start-test').disabled = false;
 		}
 	}
 };
@@ -85,10 +89,6 @@ document.getElementById('start-test').disabled = true;
 var s = document.createElement('script');
 s.type="text/javascript";
 s.src="bw-test.js";
-s.onload = function() {
-	document.getElementById('start-test').disabled = false;
-};
-document.getElementsByTagName('head')[0].appendChild(s);
 
 document.getElementById('start-test').onclick=function() {
 	PERFORMANCE.BWTest.init();
@@ -96,5 +96,7 @@ document.getElementById('start-test').onclick=function() {
 	PERFORMANCE.BWTest.run();
 	return false;
 };
+
+document.getElementsByTagName('head')[0].appendChild(s);
 
 }());
