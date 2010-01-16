@@ -231,7 +231,7 @@ var img_loaded = function(i, tstart, run, success)
 
 		// First run is a pilot test to decide what the largest 3 images can be
 		// Remaining runs only try to pull these 3 images
-		if(runs_left == nruns && i>2) {
+		if(run === nruns && i>2) {
 			smallest_image = i-2;
 		}
 		PERFORMANCE.BWTest.run();
@@ -255,7 +255,7 @@ var finish = function()
 		lsumsq += latencies[i]*latencies[i];
 	}
 	// arithmetic mean
-	latency = Math.round(latency/latencies.length);
+	latencya = Math.round(latencya/latencies.length);
 
 	var l_sd = Math.sqrt(lsumsq/latencies.length  -  Math.pow(lsum/latencies.length, 2));
 	// See http://en.wikipedia.org/wiki/1.96 and http://en.wikipedia.org/wiki/Standard_error_%28statistics%29
