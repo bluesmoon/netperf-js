@@ -29,6 +29,8 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 	- PERFORMANCE.BWTest.auto_run:		By default, the test will run automatically when this script is included.  Set this to false to turn off auto run.  If you do this, you need to
 						call PERFORMANCE.BWTest.run() on your own when you're ready to run the test.
 
+	- PERFORMANCE.BWTest.sample:		Sample percentage.  Set this to a number between 0 and 100 to only test the bandwidth for that percentage of your users.  The default is 100%.
+
 	- PERFORMANCE.BWTest.timeout:		Image timeout in milliseconds - increase this if the majority of your users have slow networks, but 10000 is about as high as you should go
 
 	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer
@@ -71,6 +73,7 @@ var defaults = {
 	version: "1.2",
 	auto_run: true,
 	log_level: 'none',
+	sample: 100,
 
 	base_url: '',
 	beacon_url: '',
@@ -105,6 +108,10 @@ if(!PERFORMANCE.BWTest.base_url) {
 	alert('Set the base_url variable in this script the the directory where your bandwidth images are stored');
 	return false;
 }
+
+// if this page view does not fall into the random sample, don't bother with the test
+if(Math.random()*100 >= PERFORMANCE.BWTest.sample)
+	return true;
 
 var base_url = PERFORMANCE.BWTest.base_url;
 var beacon_url = PERFORMANCE.BWTest.beacon_url;
