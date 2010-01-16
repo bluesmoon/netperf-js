@@ -47,6 +47,7 @@ Methods:
 	- PERFORMANCE.BWTest.init():		Call this to reinitialise test runs.  Required if you call run() multiple times.
 
 Events:
+	- PERFORMANCE.BWTest.onload:		Callback function that will be called when this file has finished loading.  No parameters are passed to this function.
 	- PERFORMANCE.BWTest.oncomplete:	Callback function that will be called when the test has completed.  The result object (as described below) will be passed to this function.
 	- PERFORMANCE.BWTest.onloop:		Callback function that will be called before each loop iteration.  This function is called with an object parameter with the following structure:
 							{
@@ -399,3 +400,6 @@ if(PERFORMANCE.BWTest.auto_run)
 	PERFORMANCE.BWTest.run();
 
 }());
+
+if(PERFORMANCE.BWTest.onload)
+	PERFORMANCE.BWTest.onload();
