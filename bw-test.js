@@ -117,6 +117,7 @@ var runs_left=nruns;
 
 var img_sizes=[10854, 130091, 579015, 1007914, 2148070, 7886174, 11728156];
 var nimages = img_sizes.length;
+var smallest_image = 0;
 
 var results = [];
 var latencies = [];
@@ -133,6 +134,7 @@ PERFORMANCE.BWTest.init = function()
 {
 	runs_left=nruns;
 	latency_runs=10;
+	smallest_image=0;
 	results = [];
 	latencies = [];
 };
@@ -152,7 +154,7 @@ var start = function()
 		if(PERFORMANCE.BWTest.onloop)
 			if(PERFORMANCE.BWTest.onloop({ type: "bandwidth", runs_left: runs_left }) === false)
 				return finish();
-		load_img(0, runs_left--, img_loaded);
+		load_img(smallest_image, runs_left--, img_loaded);
 	}
 	else {
 		if(PERFORMANCE.BWTest.onloop)
@@ -218,6 +220,12 @@ var img_loaded = function(i, tstart, run, success)
 	// we terminate if an image timed out because that means the connection is too slow to go to the next image
 	if(i >= nimages-1 || typeof results[nruns-run].r[i+1] !== 'undefined') {
 		console_log(results[nruns-run]);
+
+		// First run is a pilot test to decide what the largest 3 images can be
+		// Remaining runs only try to pull these 3 images
+		if(runs_left == nruns && i>2) {
+			smallest_image = i-2;
+		}
 		PERFORMANCE.BWTest.run();
 	} else {
 		load_img(i+1, run, img_loaded);
