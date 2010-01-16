@@ -291,6 +291,8 @@ var finish = function()
 			// discard first reading since it pays the price for DNS, TCP setup and slowstart
 			if(i==0 && j==0)
 				continue;
+			if(typeof r[j] === 'undefined')	// if we hit an undefined image time, it means we skipped everything before this
+				break;
 			if(r[j].t === null)
 				continue;
 
