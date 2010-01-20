@@ -3,3 +3,18 @@
    on how to use this code.  Also look at index.html and runtest.js
 3. Update the base_url variable in bw-test.js to the URL that you unzipped the files into
 4. You can get rid of the tests/ directory once you're done reading it
+
+
+ChangeLog
+---------
+1.2: 2010-01-19
+http://tech.bluesmoon.info/2010/01/bandwidth-test-v12.html
+
+
+1.1: 2010-01-10
+http://tech.bluesmoon.info/2010/01/bandwidth-test-v11.html
+
+
+1.0: 2010-01-02
+http://tech.bluesmoon.info/2010/01/run-your-own-bandwidth-test.html
+
