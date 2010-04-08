@@ -34,7 +34,7 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 	- PERFORMANCE.BWTest.timeout:		Test timeout in milliseconds - default is 15 seconds.  If the test takes longer than this time, it will terminate and return results immediately.
 						Connections under 28kbps will be unable to complete 3 runs at this timeout.
 
-	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer
+	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer.  The default is 4.
 
 	- PERFORMANCE.BWTest.latency_runs:	The number of measures of latency.  This is relatively cheap, so no need to change it
 
@@ -82,7 +82,7 @@ var defaults = {
 	beacon_url: '',
 
 	timeout: 15000,
-	nruns: 3,
+	nruns: 4,
 	latency_runs: 10
 };
 
@@ -271,10 +271,10 @@ var img_loaded = function(i, tstart, run, success)
 	if(i >= nimages-1 || typeof results[nruns-run].r[i+1] !== 'undefined') {
 		console_log(results[nruns-run]);
 
-		// First run is a pilot test to decide what the largest 2 images that we can download are
-		// Remaining runs only try to pull these 2 images
-		if(run === nruns && i>1) {
-			smallest_image = i-1;
+		// First run is a pilot test to decide what the largest image that we can download is
+		// All following runs only try to download this image
+		if(run === nruns) {
+			smallest_image = i;
 		}
 		defer(start);
 	} else {
