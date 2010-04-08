@@ -343,12 +343,12 @@ var calc_bw = function(latency)
 			n++;
 			nimgs++;
 
-			var bw = img_sizes[j]*1000/r[j].t;
+			var bw = images[j].size*1000/r[j].t;
 			bandwidths.push(Math.round(bw));
 			sum+=b;
 			sumsq+=b*b;
 
-			var bw_c = img_sizes[j]*1000/(r[j].t - latency);
+			var bw_c = images[j].size*1000/(r[j].t - latency);
 			bandwidths_corrected.push(Math.round(bw_c));
 			sum_corrected += bw_c;
 			sumsq_corrected += bw_c*bw_c;
