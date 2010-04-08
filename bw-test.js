@@ -71,7 +71,7 @@ the following parameters:
 (function() {
 
 var defaults = {
-	version: "1.2",
+	version: "1.3",
 	auto_run: true,
 	log_level: 'none',
 	sample: 100,
@@ -86,9 +86,9 @@ var defaults = {
 
 
 
-// ---------------------------------------
-// Do not change anything below this line
-// ---------------------------------------
+// ------------------------------------------------------------------------------------
+// Do not change anything below this line unless you're adding new features/fixing bugs
+// ------------------------------------------------------------------------------------
 
 if(typeof PERFORMANCE === 'undefined')
 	window.PERFORMANCE = {};
@@ -123,7 +123,13 @@ var latency_runs = PERFORMANCE.BWTest.latency_runs;
 
 var runs_left=nruns;
 
-var img_sizes=[10854, 130091, 579015, 1007914, 2148070, 7886174, 11728156];
+// We choose image sizes so that we can narrow down on a bandwidth range as soon as possible
+// the sizes chosen correspond to bandwidth values of 14-64kbps, 64-256kbps, 256-1024kbps, 1-2Mbps, 2-8Mbps, 8-30Mbps & 30Mbps+
+// Anything below 14kbps will probably timeout before the test completes
+// Anything over 60Mbps will probably be unreliable since latency will make up the largest part of download time
+// If you want to extend this further to cover 100Mbps & 1Gbps networks, use image sizes of 19,200,000 & 153,600,000 bytes respectively
+var img_sizes=[11483, 40658, 164897, 381756, 1234664, 4509613, 9084559];
+
 var nimages = img_sizes.length;
 var smallest_image = 0;
 
