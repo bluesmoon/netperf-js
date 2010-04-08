@@ -128,10 +128,21 @@ var runs_left=nruns;
 // Anything below 14kbps will probably timeout before the test completes
 // Anything over 60Mbps will probably be unreliable since latency will make up the largest part of download time
 // If you want to extend this further to cover 100Mbps & 1Gbps networks, use image sizes of 19,200,000 & 153,600,000 bytes respectively
-var img_sizes=[11483, 40658, 164897, 381756, 1234664, 4509613, 9084559];
+var images=[
+	{ name: "image-0.png", size: 11483, timeout: 1500 }, 
+	{ name: "image-1.png", size: 40658, timeout: 1400 }, 
+	{ name: "image-2.png", size: 164897, timeout: 1400 }, 
+	{ name: "image-3.png", size: 381756, timeout: 1500 }, 
+	{ name: "image-4.png", size: 1234664, timeout: 1300 }, 
+	{ name: "image-5.png", size: 4509613, timeout: 1300 }, 
+	{ name: "image-6.png", size: 9084559, timeout: 1500 }
+];
 
-var nimages = img_sizes.length;
+var nimages = images.length;
 var smallest_image = 0;
+
+// abuse arrays to do the latency test simply because it avoids a bunch of branches in the rest of the code
+images['l'] = { name: "image-l.gif", size: 35, timeout: 1000 };
 
 var results = [];
 var latencies = [];
@@ -185,7 +196,7 @@ var defer = function(method)
 
 var load_img = function(i, run, callback)
 {
-	var url = base_url + 'image-' + i + '.' + (i==='l'?'gif':'png') + '?t=' + (new Date().getTime()) + Math.random();
+	var url = base_url + images[i].name + '?t=' + (new Date().getTime()) + Math.random();
 	var timer=0, tstart=0;
 	var img = new Image();
 
@@ -194,7 +205,7 @@ var load_img = function(i, run, callback)
 
 	// the timeout does not abort download of the current image, it just sets an end of loop flag so the next image won't download
 	// we still need to wait until onload or onerror fire to be sure that the image download isn't using up bandwidth.
-	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, Math.min(timeout, (typeof i === 'string' ? timeout : img_sizes[i]/2)));
+	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, images[i].timeout)));
 
 	tstart = new Date().getTime();
 	img.src=url;
@@ -235,10 +246,10 @@ var img_loaded = function(i, tstart, run, success)
 	if(i >= nimages-1 || typeof results[nruns-run].r[i+1] !== 'undefined') {
 		console_log(results[nruns-run]);
 
-		// First run is a pilot test to decide what the largest 3 images can be
-		// Remaining runs only try to pull these 3 images
-		if(run === nruns && i>2) {
-			smallest_image = i-2;
+		// First run is a pilot test to decide what the largest 2 images that we can download are
+		// Remaining runs only try to pull these 2 images
+		if(run === nruns && i>1) {
+			smallest_image = i-1;
 		}
 		PERFORMANCE.BWTest.run();
 	} else {
@@ -247,55 +258,58 @@ var img_loaded = function(i, tstart, run, success)
 };
 
 var ncmp = function(a, b) { return (a-b); };
-var finish = function()
+
+var calc_latency = function()
 {
-	var i, j, n=0;
+	var	i, n=latencies.length,
+		sum=0, sumsq=0,
+		amean, median,
+		std_dev, std_err;
 
-	var latencya=0;
-	var lsum=0;
-	var lsumsq=0;
+	// First we get the arithmetic mean, standard deviation and standard error
 	for(i=0; i<latencies.length; i++) {
-		latencya += latencies[i];
-
-		lsum += latencies[i];
-		lsumsq += latencies[i]*latencies[i];
+		sum += latencies[i];
+		sumsq += latencies[i] * latencies[i];
 	}
-	// arithmetic mean
-	latencya = Math.round(latencya/latencies.length);
 
-	var l_sd = Math.sqrt(lsumsq/latencies.length  -  Math.pow(lsum/latencies.length, 2));
+	amean = Math.round(sum / n);
+
+	std_dev = Math.sqrt( sumsq/n - sum*sum/(n*n));
+
 	// See http://en.wikipedia.org/wiki/1.96 and http://en.wikipedia.org/wiki/Standard_error_%28statistics%29
-	var l_se = (1.96 * l_sd/Math.sqrt(latencies.length)).toFixed(2);
-	l_sd = l_sd.toFixed(2);
+	std_err = (1.96 * std_dev/Math.sqrt(n)).toFixed(2);
 
-	// iqr filtering and then median
-	latencies = iqr(latencies.sort(ncmp));
-	console_log(latencies);
-	n = latencies.length-1;
-	var latency = Math.round((latencies[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2);
+	std_dev = std_dev.toFixed(2);
 
-	var bw=0,
-	    bw_c=0,
-	    bsum=0,
-	    bsumsq=0,
-	    bsum_c=0,
-	    bsumsq_c=0,
-	    bws=[],
-	    bws_c=[],
-	    bwa, bw_sd, bw_se,
-	    bwa_c, bw_sd_c, bw_se_c,
-	    bwm, p95,
-	    bwm_c, p95_c;
 
-	n=0;
+	// Next we do IQR filtering and get the median
+	var lat_filtered = iqr(latencies.sort(ncmp));
+	console_log(lat_filtered);	// sometimes this results in an empty array
+
+	n = lat_filtered.length-1;
+
+	median = Math.round((lat_filtered[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2);
+
+
+	return { mean: amean, median: median, stddev: std_dev, stderr: std_err };
+};
+
+var calc_bw = function(latency)
+{
+	var	i, j, n=0,
+		r, bandwidths=[], bandwidths_corrected=[],
+		sum=0, sumsq=0, sum_corrected=0, sumsq_corrected=0,
+		amean, std_dev, std_err, median,
+		amean_corrected, std_dev_corrected, std_err_corrected, median_corrected;
+
 	for(i=0; i<nruns; i++) {
-		var r = results[i].r;
+		r=results[i].r;
 
 		// the next loop we iterate through backwards and only consider the largest 3 images that succeeded
 		// that way we don't consider small images that downloaded fast without really saturating the network
 		var nimgs=0;
 		for(j=r.length-1; j>=0 && nimgs<3; j--) {
-			// discard first reading since it pays the price for DNS, TCP setup and slowstart
+			// discard first value that was calculated since it pays the price for DNS, TCP setup and slowstart
 			if(i==0 && j==0)
 				continue;
 			if(typeof r[j] === 'undefined')	// if we hit an undefined image time, it means we skipped everything before this
@@ -306,69 +320,87 @@ var finish = function()
 			n++;
 			nimgs++;
 
-			var b = img_sizes[j]*1000/r[j].t;
-			bws.push(Math.round(b));
-			bsum+=b;
-			bsumsq+=b*b;
+			var bw = img_sizes[j]*1000/r[j].t;
+			bandwidths.push(Math.round(bw));
+			sum+=b;
+			sumsq+=b*b;
 
-			var b_c = img_sizes[j]*1000/(r[j].t - latency);
-			bws_c.push(Math.round(b_c));
-			bsum_c+=b_c;
-			bsumsq_c+=b_c*b_c;
+			var bw_c = img_sizes[j]*1000/(r[j].t - latency);
+			bandwidths_corrected.push(Math.round(bw_c));
+			sum_corrected += bw_c;
+			sumsq_corrected += bw_c*bw_c;
 		}
 	}
 
-
 	console_log('got ' + n + ' readings');
 
-	bwa = Math.round(bsum/n);
-	bw_sd = Math.sqrt(bsumsq/n - Math.pow(bsum/n, 2));
-	bw_se = Math.round(1.96*bw_sd/Math.sqrt(n));
-	bw_sd = Math.round(bw_sd);
+	// first get the mean and corrected mean
+	amean = Math.round(sum/n);
+	std_dev = Math.sqrt(sumsq/n - Math.pow(sum/n, 2));
+	std_err = Math.round(1.96 * std_dev/Math.sqrt(n));
+	std_dev = Math.round(std_dev);
 
-	bwa_c = Math.round(bsum_c/n);
-	bw_sd_c = Math.sqrt(bsumsq_c/n - Math.pow(bsum_c/n, 2));
-	bw_se_c = Math.round(1.96 * bw_sd_c/Math.sqrt(n));
-	bw_sd_c = Math.round(bw_sd_c);
+	amean_corrected = Math.round(sum_corrected/n);
+	std_dev = Math.sqrt(sumsq/n - Math.pow(sum_corrected/n, 2));
+	std_err_corrected = Math.round(1.96 * std_dev_corrected/Math.sqrt(n));
+	std_dev_corrected = Math.round(std_dev_corrected);
 
 	console_log('bandwidths: ' + bws);
 	console_log('corrected: ' + bws_c);
 
-	if(bws.length > 3) {
-		bws = iqr(bws.sort(ncmp));
-		bws_c = iqr(bws_c.sort(ncmp));
+	// then do IQR filtering and get the median
+
+	if(bandwidths.length > 3) {
+		bandwidths = iqr(bandwidths.sort(ncmp));
+		bandwidths_corrected = iqr(bandwidths_corrected.sort(ncmp));
 	} else {
-		bws = bws.sort(ncmp);
-		bws_c = bws_c.sort(ncmp);
+		bandwidths = bandwidths.sort(ncmp);
+		bandwidths_corrected = bandwidths_corrected.sort(ncmp);
 	}
-	n = bws.length-1;
-	bwm = Math.round((bws[Math.floor(n/2)] + bws[Math.ceil(n/2)])/2);
-	p95 = Math.round(bws[Math.ceil(n*.95)]);
-	n_c = bws_c.length-1;
-	bwm_c = Math.round((bws_c[Math.floor(n_c/2)] + bws_c[Math.ceil(n_c/2)])/2);
-	p95_c = Math.round(bws_c[Math.ceil(n_c*.95)]);
+	n = bandwidths.length-1;
+	median = Math.round((bandwidths[Math.floor(n/2)] + bandwidths[Math.ceil(n/2)])/2);
+
+	n = bandwidths_corrected.length-1;
+	median_corrected = Math.round((bandwidths_corrected[Math.floor(n/2)] + bandwidths_corrected[Math.ceil(n/2)])/2);
 
 	console_log('after iqr: ' + bws);
 	console_log('corrected: ' + bws_c);
 
-	console_log('amean: ' + bwa + ', median: ' + bwm + ', 95th pc: ' + p95);
-	console_log('corrected amean: ' + bwa_c + ', median: ' + bwm_c + ', 95th pc: ' + p95_c);
-	
+	console_log('amean: ' + amean + ', median: ' + median);
+	console_log('corrected amean: ' + amean_corrected + ', median: ' + median_corrected);
+
+	return {
+		mean: amean,
+		stddev: std_dev,
+		stderr: std_err,
+		median: median,
+		mean_corrected: amean_corrected,
+		stddev_corrected: std_dev_corrected,
+		stderr_corrected: std_err_corrected,
+		median_corrected: median_corrected
+	};
+};
+
+var finish = function()
+{
+	var l = calc_latency();
+	var bw = calc_bw(latency);
+
 	if(beacon_url) {
 		var img = new Image();
-		img.src = beacon_url + '?bw=' + bwm + '&bwa=' + bwa + '&bwsd=' + bw_sd + '&bwse=' + bw_se
-			+ '&latency=' + latency + '&latencya=' + latencya + '&latencysd=' + l_sd + '&latencyse=' + l_se;
+		img.src = beacon_url + '?bw=' + bw.median_corrected + '&bwa=' + bw.mean_corrected + '&bwsd=' + bw.stddev_corrected + '&bwse=' + bw.stderr_corrected
+			+ '&latency=' + l.median + '&latencya=' + l.mean + '&latencysd=' + l.stddev + '&latencyse=' + l.stderr;
 	}
 
 	var o = {
-		bandwidth_median:	bwm,
-		bandwidth_amean:	bwa,
-		bandwidth_stddev:	bw_sd,
-		bandwidth_stderr:	bw_se,
-		latency_median:		latency,
-		latency_amean:		latencya,
-		latency_stddev:		l_sd,
-		latency_stderr:		l_se
+		bandwidth_median:	bw.median_corrected,
+		bandwidth_amean:	bw.mean_corrected,
+		bandwidth_stddev:	bw.stddev_corrected,
+		bandwidth_stderr:	bw.stderr_corrected,
+		latency_median:		l.median,
+		latency_amean:		l.mean,
+		latency_stddev:		l.stddev,
+		latency_stderr:		l.stderr
 	};
 
 	for(var k in o) {
