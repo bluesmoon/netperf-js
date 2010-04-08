@@ -225,7 +225,7 @@ var load_img = function(i, run, callback)
 	// the timeout does not abort download of the current image, it just sets an end of loop flag so we don't attempt download of the next image
 	// we still need to wait until onload or onerror fire to be sure that the image download isn't using up bandwidth.
 	// This also saves us if the timeout happens on the first image.  If it didn't, we'd have nothing to measure.
-	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, images[i].timeout + Math.min(400, latency ? latency.mean : 400))));
+	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, images[i].timeout + Math.min(400, latency ? latency.mean : 400));
 
 	tstart = new Date().getTime();
 	img.src=url;
