@@ -286,16 +286,20 @@ var ncmp = function(a, b) { return (a-b); };
 
 var calc_latency = function()
 {
-	var	i, n=latencies.length,
+	var	i, n,
 		sum=0, sumsq=0,
 		amean, median,
 		std_dev, std_err;
 
+	// We first do IQR filtering and use the resulting data set for all calculations
+	var lat_filtered = iqr(latencies.sort(ncmp));
+	n = lat_filtered.length;
+
 	// First we get the arithmetic mean, standard deviation and standard error
 	// We ignore the first since it paid the price of DNS lookup, TCP connect and slow start
 	for(i=1; i<n; i++) {
-		sum += latencies[i];
-		sumsq += latencies[i] * latencies[i];
+		sum += lat_filtered[i];
+		sumsq += lat_filtered[i] * lat_filtered[i];
 	}
 
 	amean = Math.round(sum / n);
@@ -308,13 +312,11 @@ var calc_latency = function()
 	std_dev = std_dev.toFixed(2);
 
 
-	// Next we do IQR filtering and get the median
-	var lat_filtered = iqr(latencies.sort(ncmp));
 	console_log(lat_filtered);	// sometimes this results in an empty array
 
 	n = lat_filtered.length-1;
 
-	median = Math.round((lat_filtered[Math.floor(n/2)] + latencies[Math.ceil(n/2)])/2);
+	median = Math.round((lat_filtered[Math.floor(n/2)] + lat_filtered[Math.ceil(n/2)])/2);
 
 
 	return { mean: amean, median: median, stddev: std_dev, stderr: std_err };
@@ -349,34 +351,18 @@ var calc_bw = function(latency)
 
 			var bw = images[j].size*1000/r[j].t;
 			bandwidths.push(Math.round(bw));
-			sum+=bw;
-			sumsq+=bw*bw;
 
 			var bw_c = images[j].size*1000/(r[j].t - latency);
 			bandwidths_corrected.push(Math.round(bw_c));
-			sum_corrected += bw_c;
-			sumsq_corrected += bw_c*bw_c;
 		}
 	}
 
 	console_log('got ' + n + ' readings');
 
-	// first get the mean and corrected mean
-	amean = Math.round(sum/n);
-	std_dev = Math.sqrt(sumsq/n - Math.pow(sum/n, 2));
-	std_err = Math.round(1.96 * std_dev/Math.sqrt(n));
-	std_dev = Math.round(std_dev);
-
-	amean_corrected = Math.round(sum_corrected/n);
-	std_dev_corrected = Math.sqrt(sumsq_corrected/n - Math.pow(sum_corrected/n, 2));
-	std_err_corrected = (1.96 * std_dev_corrected/Math.sqrt(n)).toFixed(2);
-	std_dev_corrected = std_dev_corrected.toFixed(2);
-
 	console_log('bandwidths: ' + bandwidths);
 	console_log('corrected: ' + bandwidths_corrected);
 
-	// then do IQR filtering and get the median
-
+	// First do IQR filtering since we use the median here and should use the stddev after filtering.
 	if(bandwidths.length > 3) {
 		bandwidths = iqr(bandwidths.sort(ncmp));
 		bandwidths_corrected = iqr(bandwidths_corrected.sort(ncmp));
@@ -384,14 +370,40 @@ var calc_bw = function(latency)
 		bandwidths = bandwidths.sort(ncmp);
 		bandwidths_corrected = bandwidths_corrected.sort(ncmp);
 	}
-	n = bandwidths.length-1;
-	median = Math.round((bandwidths[Math.floor(n/2)] + bandwidths[Math.ceil(n/2)])/2);
-
-	n = bandwidths_corrected.length-1;
-	median_corrected = Math.round((bandwidths_corrected[Math.floor(n/2)] + bandwidths_corrected[Math.ceil(n/2)])/2);
 
 	console_log('after iqr: ' + bandwidths);
 	console_log('corrected: ' + bandwidths_corrected);
+
+	// Now get the mean & median.  Also get corrected values that eliminate latency
+	n = Math.max(bandwidths.length, bandwidths_corrected.length);
+	for(i=0; i<n; i++) {
+		if(i<bandwidths.length) {
+			sum += bandwidths[i];
+			sumsq += Math.pow(bandwidths[i], 2);
+		}
+		if(i<bandwidths_corrected.length) {
+			sum_corrected += bandwidths_corrected[i];
+			sumsq_corrected += Math.pow(bandwidths_corrected[i], 2);
+		}
+	}
+
+	n = bandwidths.length;
+	amean = Math.round(sum/n);
+	std_dev = Math.sqrt(sumsq/n - Math.pow(sum/n, 2));
+	std_err = Math.round(1.96 * std_dev/Math.sqrt(n));
+	std_dev = Math.round(std_dev);
+
+	n = bandwidths.length-1;
+	median = Math.round((bandwidths[Math.floor(n/2)] + bandwidths[Math.ceil(n/2)])/2);
+
+	n = bandwidths_corrected.length;
+	amean_corrected = Math.round(sum_corrected/n);
+	std_dev_corrected = Math.sqrt(sumsq_corrected/n - Math.pow(sum_corrected/n, 2));
+	std_err_corrected = (1.96 * std_dev_corrected/Math.sqrt(n)).toFixed(2);
+	std_dev_corrected = std_dev_corrected.toFixed(2);
+
+	n = bandwidths_corrected.length-1;
+	median_corrected = Math.round((bandwidths_corrected[Math.floor(n/2)] + bandwidths_corrected[Math.ceil(n/2)])/2);
 
 	console_log('amean: ' + amean + ', median: ' + median);
 	console_log('corrected amean: ' + amean_corrected + ', median: ' + median_corrected);
