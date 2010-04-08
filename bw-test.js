@@ -31,7 +31,7 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 
 	- PERFORMANCE.BWTest.sample:		Sample percentage.  Set this to a number between 0 and 100 to only test the bandwidth for that percentage of your users.  The default is 100%.
 
-	- PERFORMANCE.BWTest.timeout:		Test timeout in milliseconds - default is 12 seconds.  If the test takes longer than this time, it will terminate and return results immediately.
+	- PERFORMANCE.BWTest.timeout:		Test timeout in milliseconds - default is 15 seconds.  If the test takes longer than this time, it will terminate and return results immediately.
 						Connections under 28kbps will be unable to complete 3 runs at this timeout.
 
 	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer
@@ -81,7 +81,7 @@ var defaults = {
 	base_url: '',
 	beacon_url: '',
 
-	timeout: 12000,
+	timeout: 15000,
 	nruns: 3,
 	latency_runs: 10
 };
@@ -329,6 +329,10 @@ var calc_bw = function(latency)
 		amean_corrected, std_dev_corrected, std_err_corrected, median_corrected;
 
 	for(i=0; i<nruns; i++) {
+		if(!results[i] || !results[i].r) {
+			continue;
+		}
+
 		r=results[i].r;
 
 		// the next loop we iterate through backwards and only consider the largest 3 images that succeeded
@@ -364,12 +368,12 @@ var calc_bw = function(latency)
 	std_dev = Math.round(std_dev);
 
 	amean_corrected = Math.round(sum_corrected/n);
-	std_dev = Math.sqrt(sumsq/n - Math.pow(sum_corrected/n, 2));
-	std_err_corrected = Math.round(1.96 * std_dev_corrected/Math.sqrt(n));
-	std_dev_corrected = Math.round(std_dev_corrected);
+	std_dev_corrected = Math.sqrt(sumsq_corrected/n - Math.pow(sum_corrected/n, 2));
+	std_err_corrected = (1.96 * std_dev_corrected/Math.sqrt(n)).toFixed(2);
+	std_dev_corrected = std_dev_corrected.toFixed(2);
 
-	console_log('bandwidths: ' + bws);
-	console_log('corrected: ' + bws_c);
+	console_log('bandwidths: ' + bandwidths);
+	console_log('corrected: ' + bandwidths_corrected);
 
 	// then do IQR filtering and get the median
 
@@ -386,8 +390,8 @@ var calc_bw = function(latency)
 	n = bandwidths_corrected.length-1;
 	median_corrected = Math.round((bandwidths_corrected[Math.floor(n/2)] + bandwidths_corrected[Math.ceil(n/2)])/2);
 
-	console_log('after iqr: ' + bws);
-	console_log('corrected: ' + bws_c);
+	console_log('after iqr: ' + bandwidths);
+	console_log('corrected: ' + bandwidths_corrected);
 
 	console_log('amean: ' + amean + ', median: ' + median);
 	console_log('corrected amean: ' + amean_corrected + ', median: ' + median_corrected);
