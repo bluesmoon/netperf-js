@@ -345,8 +345,8 @@ var calc_bw = function(latency)
 
 			var bw = images[j].size*1000/r[j].t;
 			bandwidths.push(Math.round(bw));
-			sum+=b;
-			sumsq+=b*b;
+			sum+=bw;
+			sumsq+=bw*bw;
 
 			var bw_c = images[j].size*1000/(r[j].t - latency);
 			bandwidths_corrected.push(Math.round(bw_c));
