@@ -31,7 +31,8 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 
 	- PERFORMANCE.BWTest.sample:		Sample percentage.  Set this to a number between 0 and 100 to only test the bandwidth for that percentage of your users.  The default is 100%.
 
-	- PERFORMANCE.BWTest.timeout:		Image timeout in milliseconds - increase this if the majority of your users have slow networks, but 10000 is about as high as you should go
+	- PERFORMANCE.BWTest.timeout:		Test timeout in milliseconds - default is 12 seconds.  If the test takes longer than this time, it will terminate and return results immediately.
+						Connections under 28kbps will be unable to complete 3 runs at this timeout.
 
 	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer
 
@@ -45,6 +46,7 @@ These parameters should be set BEFORE including the script on your page.
 Methods:
 	- PERFORMANCE.BWTest.run():		Call this to start the test manually.  Required if you set PERFORMANCE.BWTest.auto_run to false.
 	- PERFORMANCE.BWTest.init():		Call this to reinitialise test runs.  Required if you call run() multiple times.
+	- PERFORMANCE.BWTest.abort();		Call this to abort the test at any time and return whatever data it has already collected.  The oncomplete event will be fired after this method returns
 
 Events:
 	- PERFORMANCE.BWTest.onload:		Callback function that will be called when this file has finished loading.  No parameters are passed to this function.
@@ -79,7 +81,7 @@ var defaults = {
 	base_url: '',
 	beacon_url: '',
 
-	timeout: 3000,
+	timeout: 12000,
 	nruns: 3,
 	latency_runs: 10
 };
@@ -128,14 +130,15 @@ var runs_left=nruns;
 // Anything below 14kbps will probably timeout before the test completes
 // Anything over 60Mbps will probably be unreliable since latency will make up the largest part of download time
 // If you want to extend this further to cover 100Mbps & 1Gbps networks, use image sizes of 19,200,000 & 153,600,000 bytes respectively
+// See https://spreadsheets.google.com/ccc?key=0AplxPyCzmQi6dDRBN2JEd190N1hhV1N5cHQtUVdBMUE&hl=en_GB for a spreadsheet with the details
 var images=[
-	{ name: "image-0.png", size: 11483, timeout: 1500 }, 
-	{ name: "image-1.png", size: 40658, timeout: 1400 }, 
-	{ name: "image-2.png", size: 164897, timeout: 1400 }, 
+	{ name: "image-0.png", size: 11483, timeout: 1400 }, 
+	{ name: "image-1.png", size: 40658, timeout: 1200 }, 
+	{ name: "image-2.png", size: 164897, timeout: 1300 }, 
 	{ name: "image-3.png", size: 381756, timeout: 1500 }, 
-	{ name: "image-4.png", size: 1234664, timeout: 1300 }, 
-	{ name: "image-5.png", size: 4509613, timeout: 1300 }, 
-	{ name: "image-6.png", size: 9084559, timeout: 1500 }
+	{ name: "image-4.png", size: 1234664, timeout: 1200 }, 
+	{ name: "image-5.png", size: 4509613, timeout: 1200 }, 
+	{ name: "image-6.png", size: 9084559, timeout: 1200 }
 ];
 
 var nimages = images.length;
@@ -146,6 +149,8 @@ images['l'] = { name: "image-l.gif", size: 35, timeout: 1000 };
 
 var results = [];
 var latencies = [];
+var latency = null;
+var aborted = false;
 
 if(typeof console === 'undefined')
 	console = { log: function() {} };
@@ -162,30 +167,44 @@ PERFORMANCE.BWTest.init = function()
 	smallest_image=0;
 	results = [];
 	latencies = [];
+	latency = null;
+	aborted = false;
 };
 
 PERFORMANCE.BWTest.run = function()
 {
+	var to = setTimeout(PERFORMANCE.BWTest.abort, timeout);
+
 	defer(start);
-}
+};
+
+PERFORMANCE.BWTest.abort = function()
+{
+	aborted = true;
+	defer(finish);
+};
 
 var start = function()
 {
-	if(!latency_runs) {
+	if(aborted) {
+		return false;
+	}
+
+	if(!runs_left) {
 		finish();
 	}
-	else if(runs_left) {
+	else if(latency_runs) {
+		if(PERFORMANCE.BWTest.onloop)
+			if(PERFORMANCE.BWTest.onloop({ type: "latency", runs_left: latency_runs }) === false)
+				return finish();
+		load_img('l', latency_runs--, lat_loaded);
+	}
+	else {
 		results.push({r:[]});
 		if(PERFORMANCE.BWTest.onloop)
 			if(PERFORMANCE.BWTest.onloop({ type: "bandwidth", runs_left: runs_left }) === false)
 				return finish();
 		load_img(smallest_image, runs_left--, img_loaded);
-	}
-	else {
-		if(PERFORMANCE.BWTest.onloop)
-			if(PERFORMANCE.BWTest.onloop({ type: "latency", runs_left: latency_runs }) === false)
-				return finish();
-		load_img('l', latency_runs--, lat_loaded);
 	}
 };
 
@@ -203,9 +222,10 @@ var load_img = function(i, run, callback)
 	img.onload=function() { img=null; clearTimeout(timer); if(callback) callback(i, tstart, run, true); callback=null; };
 	img.onerror=function() { img=null; clearTimeout(timer); if(callback) callback(i, tstart, run, false); callback=null; };
 
-	// the timeout does not abort download of the current image, it just sets an end of loop flag so the next image won't download
+	// the timeout does not abort download of the current image, it just sets an end of loop flag so we don't attempt download of the next image
 	// we still need to wait until onload or onerror fire to be sure that the image download isn't using up bandwidth.
-	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, images[i].timeout)));
+	// This also saves us if the timeout happens on the first image.  If it didn't, we'd have nothing to measure.
+	timer=setTimeout(function() { if(callback) callback(i, tstart, run, null); }, images[i].timeout + Math.min(400, latency ? latency.mean : 400))));
 
 	tstart = new Date().getTime();
 	img.src=url;
@@ -220,7 +240,12 @@ var lat_loaded = function(i, tstart, run, success)
 		var lat = new Date().getTime() - tstart;
 		latencies.push(lat);
 	}
-	PERFORMANCE.BWTest.run();
+	// if we've got all the latency images at this point, we can calculate latency
+	if(latency_runs === 0) {
+		latency = calc_latency();
+	}
+
+	defer(start);
 };
 
 var img_loaded = function(i, tstart, run, success)
@@ -251,7 +276,7 @@ var img_loaded = function(i, tstart, run, success)
 		if(run === nruns && i>1) {
 			smallest_image = i-1;
 		}
-		PERFORMANCE.BWTest.run();
+		defer(start);
 	} else {
 		load_img(i+1, run, img_loaded);
 	}
@@ -267,7 +292,8 @@ var calc_latency = function()
 		std_dev, std_err;
 
 	// First we get the arithmetic mean, standard deviation and standard error
-	for(i=0; i<latencies.length; i++) {
+	// We ignore the first since it paid the price of DNS lookup, TCP connect and slow start
+	for(i=1; i<n; i++) {
 		sum += latencies[i];
 		sumsq += latencies[i] * latencies[i];
 	}
@@ -309,9 +335,6 @@ var calc_bw = function(latency)
 		// that way we don't consider small images that downloaded fast without really saturating the network
 		var nimgs=0;
 		for(j=r.length-1; j>=0 && nimgs<3; j--) {
-			// discard first value that was calculated since it pays the price for DNS, TCP setup and slowstart
-			if(i==0 && j==0)
-				continue;
 			if(typeof r[j] === 'undefined')	// if we hit an undefined image time, it means we skipped everything before this
 				break;
 			if(r[j].t === null)
@@ -383,13 +406,14 @@ var calc_bw = function(latency)
 
 var finish = function()
 {
-	var l = calc_latency();
-	var bw = calc_bw(latency);
+	if(!latency)
+		latency = calc_latency();
+	var bw = calc_bw(latency.mean);
 
 	if(beacon_url) {
 		var img = new Image();
 		img.src = beacon_url + '?bw=' + bw.median_corrected + '&bwa=' + bw.mean_corrected + '&bwsd=' + bw.stddev_corrected + '&bwse=' + bw.stderr_corrected
-			+ '&latency=' + l.median + '&latencya=' + l.mean + '&latencysd=' + l.stddev + '&latencyse=' + l.stderr;
+			+ '&latency=' + latency.median + '&latencya=' + latency.mean + '&latencysd=' + latency.stddev + '&latencyse=' + latency.stderr;
 	}
 
 	var o = {
@@ -397,10 +421,10 @@ var finish = function()
 		bandwidth_amean:	bw.mean_corrected,
 		bandwidth_stddev:	bw.stddev_corrected,
 		bandwidth_stderr:	bw.stderr_corrected,
-		latency_median:		l.median,
-		latency_amean:		l.mean,
-		latency_stddev:		l.stddev,
-		latency_stderr:		l.stderr
+		latency_median:		latency.median,
+		latency_amean:		latency.mean,
+		latency_stddev:		latency.stddev,
+		latency_stderr:		latency.stderr
 	};
 
 	for(var k in o) {
