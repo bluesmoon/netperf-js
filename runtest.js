@@ -67,7 +67,8 @@ PERFORMANCE = {
 			}
 		
 			document.getElementById('result').innerHTML = "Bandwidth: " + bw_text + "bps " + er_text + ", "
-								    + "Latency: " + o.latency_median + "ms (&#x00b1; " + (o.latency_stderr*100/o.latency_median).toPrecision(2) + "%)";
+								    + "Latency: " + o.latency_median + "ms (&#x00b1; " + (o.latency_stderr*100/o.latency_median).toPrecision(2) + "%)<br>"
+								    + "Completed in " + (o.test_time/1000).toFixed(2) + " seconds.";
 
 			console.log(o);
 		

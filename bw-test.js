@@ -32,9 +32,9 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 	- PERFORMANCE.BWTest.sample:		Sample percentage.  Set this to a number between 0 and 100 to only test the bandwidth for that percentage of your users.  The default is 100%.
 
 	- PERFORMANCE.BWTest.timeout:		Test timeout in milliseconds - default is 15 seconds.  If the test takes longer than this time, it will terminate and return results immediately.
-						Connections under 28kbps will be unable to complete 3 runs at this timeout.
+						Connections under 28kbps will be unable to complete 4 runs at this timeout.
 
-	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer.  The default is 4.
+	- PERFORMANCE.BWTest.nruns:		The number of times to run the test -- higher numbers increase accuracy, but requires more time and and a larger byte transfer.  The default is 5.
 
 	- PERFORMANCE.BWTest.latency_runs:	The number of measures of latency.  This is relatively cheap, so no need to change it
 
@@ -46,7 +46,8 @@ These parameters should be set BEFORE including the script on your page.
 Methods:
 	- PERFORMANCE.BWTest.run():		Call this to start the test manually.  Required if you set PERFORMANCE.BWTest.auto_run to false.
 	- PERFORMANCE.BWTest.init():		Call this to reinitialise test runs.  Required if you call run() multiple times.
-	- PERFORMANCE.BWTest.abort();		Call this to abort the test at any time and return whatever data it has already collected.  The oncomplete event will be fired after this method returns
+	- PERFORMANCE.BWTest.abort();		Call this to abort the test at any time and return whatever data it has already collected.  You may want to call this method in the window.onbeforeunload event.
+						The oncomplete event will be fired before this method returns.
 
 Events:
 	- PERFORMANCE.BWTest.onload:		Callback function that will be called when this file has finished loading.  No parameters are passed to this function.
@@ -82,7 +83,7 @@ var defaults = {
 	beacon_url: '',
 
 	timeout: 15000,
-	nruns: 4,
+	nruns: 5,
 	latency_runs: 10
 };
 
@@ -151,6 +152,7 @@ var results = [];
 var latencies = [];
 var latency = null;
 var aborted = false;
+var test_start = null;
 
 if(typeof console === 'undefined')
 	console = { log: function() {} };
@@ -169,22 +171,25 @@ PERFORMANCE.BWTest.init = function()
 	latencies = [];
 	latency = null;
 	aborted = false;
+	test_start = null;
 };
 
 PERFORMANCE.BWTest.run = function()
 {
 	var to = setTimeout(PERFORMANCE.BWTest.abort, timeout);
 
-	defer(start);
+	test_start = new Date().getTime();
+	defer(iterate);
 };
 
 PERFORMANCE.BWTest.abort = function()
 {
 	aborted = true;
-	defer(finish);
+	finish();	// we don't defer this call because it might be called from onbeforeunload
+			// and we want the entire chain to complete before we return
 };
 
-var start = function()
+var iterate = function()
 {
 	if(aborted) {
 		return false;
@@ -245,7 +250,7 @@ var lat_loaded = function(i, tstart, run, success)
 		latency = calc_latency();
 	}
 
-	defer(start);
+	defer(iterate);
 };
 
 var img_loaded = function(i, tstart, run, success)
@@ -276,7 +281,7 @@ var img_loaded = function(i, tstart, run, success)
 		if(run === nruns) {
 			smallest_image = i;
 		}
-		defer(start);
+		defer(iterate);
 	} else {
 		load_img(i+1, run, img_loaded);
 	}
@@ -295,12 +300,16 @@ var calc_latency = function()
 	var lat_filtered = iqr(latencies.sort(ncmp));
 	n = lat_filtered.length;
 
+	console_log(lat_filtered);	// sometimes this results in an empty array
+
 	// First we get the arithmetic mean, standard deviation and standard error
 	// We ignore the first since it paid the price of DNS lookup, TCP connect and slow start
 	for(i=1; i<n; i++) {
 		sum += lat_filtered[i];
 		sumsq += lat_filtered[i] * lat_filtered[i];
 	}
+
+	n--;	// Since we started the loop with 1 and not 0
 
 	amean = Math.round(sum / n);
 
@@ -311,8 +320,6 @@ var calc_latency = function()
 
 	std_dev = std_dev.toFixed(2);
 
-
-	console_log(lat_filtered);	// sometimes this results in an empty array
 
 	n = lat_filtered.length-1;
 
@@ -350,10 +357,10 @@ var calc_bw = function(latency)
 			nimgs++;
 
 			var bw = images[j].size*1000/r[j].t;
-			bandwidths.push(Math.round(bw));
+			bandwidths.push(bw);
 
 			var bw_c = images[j].size*1000/(r[j].t - latency);
-			bandwidths_corrected.push(Math.round(bw_c));
+			bandwidths_corrected.push(bw_c);
 		}
 	}
 
@@ -426,6 +433,8 @@ var finish = function()
 		latency = calc_latency();
 	var bw = calc_bw(latency.mean);
 
+	var test_time = new Date().getTime() - test_start;
+
 	if(beacon_url) {
 		var img = new Image();
 		img.src = beacon_url + '?bw=' + bw.median_corrected + '&bwa=' + bw.mean_corrected + '&bwsd=' + bw.stddev_corrected + '&bwse=' + bw.stderr_corrected
@@ -435,12 +444,13 @@ var finish = function()
 	var o = {
 		bandwidth_median:	bw.median_corrected,
 		bandwidth_amean:	bw.mean_corrected,
-		bandwidth_stddev:	bw.stddev_corrected,
-		bandwidth_stderr:	bw.stderr_corrected,
+		bandwidth_stddev:	parseFloat(bw.stddev_corrected, 10),
+		bandwidth_stderr:	parseFloat(bw.stderr_corrected, 10),
 		latency_median:		latency.median,
 		latency_amean:		latency.mean,
-		latency_stddev:		latency.stddev,
-		latency_stderr:		latency.stderr
+		latency_stddev:		parseFloat(latency.stddev, 10),
+		latency_stderr:		parseFloat(latency.stderr, 10),
+		test_time:		test_time
 	};
 
 	for(var k in o) {
