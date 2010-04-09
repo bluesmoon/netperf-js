@@ -22,6 +22,7 @@ To configure things only for a given page, set each parameter in the PERFORMANCE
 						- latencya: 	The arithmetic mean of HTTP latency measurements in milliseconds
 						- latencysd:	The standard deviation in all latency samples
 						- latencyse:	The standard error at 95% confidence for the reported latency value
+						- v:		This library's version string
 						You may also use this URL to set a browser cookie with the bandwidth and user's IP.
 
 						If not set, nothing will be beaconed, but you can still get the values out of the window.PERFORMANCE.BWTest object.
@@ -51,7 +52,18 @@ Methods:
 
 Events:
 	- PERFORMANCE.BWTest.onload:		Callback function that will be called when this file has finished loading.  No parameters are passed to this function.
-	- PERFORMANCE.BWTest.oncomplete:	Callback function that will be called when the test has completed.  The result object (as described below) will be passed to this function.
+	- PERFORMANCE.BWTest.oncomplete:	Callback function that will be called when the test has completed.  An object with the following structure will be passed to this function:
+							{
+								bandwidth_median:	median bandwidth value in bytes per second,
+								bandwidth_amean:	arithmetic mean of all measured bandwidth values (bytes per second),
+								bandwidth_stddev:	standard deviation from the mean in bytes per second,
+								bandwidth_stderr:	standard error at 95% confidence of the measured value (bytes per second),
+								latency_median:		median of all latency measurements in milliseconds,
+								latency_mean:		arithmetic mean of all latency measurements in milliseconds,
+								latency_stddev:		standard deviation from the mean latency (ms),
+								latency_stderr:		standard error at 95% confidence of the measured latency (ms),
+								test_time:		total time in milliseconds that the test ran for
+							}
 	- PERFORMANCE.BWTest.onloop:		Callback function that will be called before each loop iteration.  This function is called with an object parameter with the following structure:
 							{
 								type: "bandwidth" OR "latency",
@@ -438,7 +450,8 @@ var finish = function()
 	if(beacon_url) {
 		var img = new Image();
 		img.src = beacon_url + '?bw=' + bw.median_corrected + '&bwa=' + bw.mean_corrected + '&bwsd=' + bw.stddev_corrected + '&bwse=' + bw.stderr_corrected
-			+ '&latency=' + latency.median + '&latencya=' + latency.mean + '&latencysd=' + latency.stddev + '&latencyse=' + latency.stderr;
+			+ '&latency=' + latency.median + '&latencya=' + latency.mean + '&latencysd=' + latency.stddev + '&latencyse=' + latency.stderr
+			+ '&v=' + encodeURIComponent(PERFORMANCE.BWTest.version);
 	}
 
 	var o = {
