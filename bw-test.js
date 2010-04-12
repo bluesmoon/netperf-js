@@ -131,7 +131,7 @@ if(Math.random()*100 >= PERFORMANCE.BWTest.sample)
 
 var base_url = PERFORMANCE.BWTest.base_url;
 var beacon_url = PERFORMANCE.BWTest.beacon_url;
-var timeout = PERFORMANCE.BWTest.timeout;
+var timeout = { t: PERFORMANCE.BWTest.timeout, h: null};
 var nruns = PERFORMANCE.BWTest.nruns;
 var latency_runs = PERFORMANCE.BWTest.latency_runs;
 
@@ -176,6 +176,11 @@ var console_log = function() {
 
 PERFORMANCE.BWTest.init = function()
 {
+	if(timeout.h) {
+		clearTimeout(timeout.h);
+		timeout.h = null;
+	}
+
 	runs_left=nruns;
 	latency_runs=10;
 	smallest_image=0;
@@ -188,7 +193,7 @@ PERFORMANCE.BWTest.init = function()
 
 PERFORMANCE.BWTest.run = function()
 {
-	var to = setTimeout(PERFORMANCE.BWTest.abort, timeout);
+	timeout.h = setTimeout(PERFORMANCE.BWTest.abort, timeout.t);
 
 	test_start = new Date().getTime();
 	defer(iterate);
@@ -441,6 +446,11 @@ var calc_bw = function(latency)
 
 var finish = function()
 {
+	if(timeout.h) {
+		clearTimeout(timeout.h);
+		timeout.h = null;
+	}
+
 	if(!latency)
 		latency = calc_latency();
 	var bw = calc_bw(latency.mean);
