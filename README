@@ -1,3 +1,18 @@
+Project retiring/moved
+======================
+
+Now that I've pushed out boomerang (http://github.com/yahoo/boomerang/), I will no longer
+update this project separately.  The bandwidth measurement code has been rolled into
+boomerang, and I'll continue development there.  You should use boomerang instead.
+
+Thanks for watching.
+
+Philip
+
+
+======================
+
+
 1. Unpack the .zip file into a web accessible directory
 2. Read the comments in bw-test.js or look at the tests in tests/*.html for information
    on how to use this code.  Also look at index.html and runtest.js
